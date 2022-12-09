@@ -13,7 +13,7 @@ namespace GongSolutions.Wpf.DragDrop.Utilities
             where T : UIElement
         {
             var uiElement = GetHitTestElement4Type<T>(sender, elementPosition);
-            return uiElement is { Visibility: Visibility.Visible };
+            return uiElement is { Visibility: Visibility.Visible, IsHitTestVisible: true };
         }
 
         private static T GetHitTestElement4Type<T>(object sender, Point elementPosition)
