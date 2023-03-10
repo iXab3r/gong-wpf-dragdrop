@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,11 +11,19 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using GongSolutions.Wpf.DragDrop.Icons;
 using GongSolutions.Wpf.DragDrop.Utilities;
+using Brushes = System.Windows.Media.Brushes;
+using Image = System.Windows.Controls.Image;
+using Pen = System.Windows.Media.Pen;
+using Point = System.Windows.Point;
+using SystemFonts = System.Windows.SystemFonts;
 
 namespace GongSolutions.Wpf.DragDrop
 {
     public static partial class DragDrop
     {
+        private static readonly TimeSpan ScrollThrottlePeriod = TimeSpan.FromMilliseconds(50);
+        private static TimeSpan lastScrollTimestamp;
+        
         /// <summary>
         /// Gets the drag handler from the drag info or from the sender, if the drag info is null
         /// </summary>
@@ -366,33 +376,48 @@ namespace GongSolutions.Wpf.DragDrop
                 return;
             }
 
-            var scrollViewer = dropInfo.TargetScrollViewer;
             var scrollingMode = dropInfo.TargetScrollingMode;
-
-            var position = e.GetPosition(scrollViewer);
-            var scrollMargin = Math.Min(scrollViewer.FontSize * 2, scrollViewer.ActualHeight / 2);
-
-            if (scrollingMode == ScrollingMode.Both || scrollingMode == ScrollingMode.HorizontalOnly)
+            if (scrollingMode == ScrollingMode.None)
             {
-                if (position.X >= scrollViewer.ActualWidth - scrollMargin && scrollViewer.HorizontalOffset < scrollViewer.ExtentWidth - scrollViewer.ViewportWidth)
+                return;
+            }
+            
+            var stopwatchTimestamp = TimeSpan.FromSeconds(Stopwatch.GetTimestamp() / (float) Stopwatch.Frequency);
+            if (stopwatchTimestamp - lastScrollTimestamp < ScrollThrottlePeriod)
+            {
+                return;
+            }
+            lastScrollTimestamp = stopwatchTimestamp;
+
+            var scrollViewer = dropInfo.TargetScrollViewer;
+            var position = e.GetPosition(scrollViewer);
+            var scrollMargin = new
+            {
+                Horizontal = Math.Min(scrollViewer.FontSize * 2, scrollViewer.ActualWidth / 2),
+                Vertical = Math.Min(scrollViewer.FontSize * 2, scrollViewer.ActualHeight / 2),
+            };
+            
+            if (scrollingMode is ScrollingMode.Both or ScrollingMode.VerticalOnly)
+            {
+                if (position.Y >= scrollViewer.ActualHeight - scrollMargin.Vertical && scrollViewer.VerticalOffset < scrollViewer.ExtentHeight - scrollViewer.ViewportHeight)
                 {
-                    scrollViewer.LineRight();
+                    scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + scrollMargin.Vertical / 2);
                 }
-                else if (position.X < scrollMargin && scrollViewer.HorizontalOffset > 0)
+                else if (position.Y < scrollMargin.Vertical && scrollViewer.VerticalOffset > 0)
                 {
-                    scrollViewer.LineLeft();
+                    scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - scrollMargin.Vertical / 2);
                 }
             }
 
-            if (scrollingMode == ScrollingMode.Both || scrollingMode == ScrollingMode.VerticalOnly)
+            if (scrollingMode is ScrollingMode.Both or ScrollingMode.HorizontalOnly)
             {
-                if (position.Y >= scrollViewer.ActualHeight - scrollMargin && scrollViewer.VerticalOffset < scrollViewer.ExtentHeight - scrollViewer.ViewportHeight)
+                if (position.X >= scrollViewer.ActualWidth - scrollMargin.Horizontal && scrollViewer.HorizontalOffset < scrollViewer.ExtentWidth - scrollViewer.ViewportWidth)
                 {
-                    scrollViewer.LineDown();
+                    scrollViewer.ScrollToHorizontalOffset(scrollViewer.HorizontalOffset + scrollMargin.Horizontal / 2);
                 }
-                else if (position.Y < scrollMargin && scrollViewer.VerticalOffset > 0)
+                else if (position.X < scrollMargin.Horizontal && scrollViewer.HorizontalOffset > 0)
                 {
-                    scrollViewer.LineUp();
+                    scrollViewer.ScrollToHorizontalOffset(scrollViewer.HorizontalOffset - scrollMargin.Horizontal / 2);
                 }
             }
         }
